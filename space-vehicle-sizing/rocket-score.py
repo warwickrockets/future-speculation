@@ -31,10 +31,14 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
         chamberPressure=exitPressure/chokedPressureRatio
 
     if (vehicleDiameter<0.1):
-        outerPenalties+=1000*(0.1-self.vehicleDiameter);
-        print('Such a small vehicle diameter is... UNACCEPTABLE! '+str(1000*(0.1-self.vehicleDiameter))+' YEARS DUNGEON');
+        outerPenalties+=1000*(0.1-vehicleDiameter);
+        print('Such a small vehicle diameter is... UNACCEPTABLE! '+str(1000*(0.1-vehicleDiameter))+' YEARS DUNGEON');
         vehicleDiameter=0.01
-        calculateMasses       
+        
+    if (TMR<0):
+        outerPenalties+=-TMR*10000
+        print('You are having a bad problem and will not go to space today! Penalty: '+str(-TMR*10000)+' YEARS DUNGEON');
+        TMR=-TMR
        
     print('using '+str(np.array([chamberPressure,exitPressure,vehicleDiameter,TMR])))
     
@@ -52,6 +56,7 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
     return testRocket
     
 def rocketScore(theRocket):
+    print(str(theRocket.penalties)+","+str(-theRocket.totalLiftoffMass))
     return theRocket.penalties-theRocket.totalLiftoffMass
     
 def scoreFromFourVector(v):
@@ -70,7 +75,9 @@ initialGuess=np.array([1e6,8e4,0.3,20])
 #y0=np.array([0,0,stupid.totalLiftoffMass])
 
 #stupidTwo=buildRocket(7.27e4, 4.164e4,1.27189,6.20302796e+01,None)
-stupidThree=buildRocket(1.81580227e+05, 4.05300000e+04, 1.19586946e+00, 6.89228057e+01,100000)
-burnTime=(stupidThree.fuelMass+stupidThree.oxMass)/stupidThree.engine.mdot
-tee=np.concatenate([np.linspace(0,burnTime),np.linspace(burnTime*1.02,300,num=100)])
-y=stupidThree.getTrajectory(tee,np.array([0.0,0.0,stupidThree.totalLiftoffMass]))
+
+#When resized, this guy has a terminal velocity of 7000 m/s, which means it wants more landing propellant than there is available.
+#stupidThree=buildRocket(1.81580227e+05, 4.05300000e+04, 1.19586946e+00, 6.89228057e+01,100000) 
+#burnTime=(stupidThree.fuelMass+stupidThree.oxMass)/stupidThree.engine.mdot
+#tee=np.concatenate([np.linspace(0,burnTime),np.linspace(burnTime*1.02,300,num=100)])
+#y=stupidThree.getTrajectory(tee,np.array([0.0,0.0,stupidThree.totalLiftoffMass]))

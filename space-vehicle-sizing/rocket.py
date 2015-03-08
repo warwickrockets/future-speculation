@@ -212,6 +212,11 @@ class candidateRocket(object):
         
         self.landingPropellantMass=self.finalBurnoutMass*(exp((self.emptyTerminalVelocity())/(self.engine.v_e_effective(SLPRESSURE, engineEfficiency)))-1)
         
+        if self.landingPropellantMass>(0.95*(self.fuelMass+self.oxMass)):
+            self.penalties+=self.landingPropellantMass-(0.95*(self.fuelMass+self.oxMass))
+            print("That much landing propellant is UNACCEPTABLE! "+str(self.landingPropellantMass-(0.95*(self.fuelMass+self.oxMass)))+" YEARS DUNGEON")
+            self.landingPropellantMass=0.95*(self.fuelMass+self.oxMass);
+        
         self.MECOMass=self.finalBurnoutMass+self.landingPropellantMass;
         
         
@@ -261,7 +266,7 @@ class candidateRocket(object):
         return np.array([xdot,vdot,mdot])
         
     def getTrajectory(self, t, y0):
-        traj=spint.odeint(self.ydot, y0, t, mxstep=5000);
+        traj=spint.odeint(self.ydot, y0, t);
         return traj;
         
     def getApogee(self):
@@ -316,6 +321,7 @@ class candidateRocket(object):
                 self.pressurantMass*=scaleFactor
                 
                 self.calculateMasses()
+                self.validate()
                 
                 self.sizeEngineToTMR(currentLTMR)
                 
