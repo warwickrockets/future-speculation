@@ -65,11 +65,7 @@ class engine(object):
         self.chamberDiameter=self.throatDiameter*contractionRatio;
     
     def thrust(self,ambientPressure,engineEfficiency):
-        if(self.exitPressure<0.4*ambientPressure):
-            #Flow separation isn't actually this bad, but it's a good way to dissuade optimisation algorithms from letting the flow separate.
-            return 0; 
-        else:
-            return engineEfficiency*self.mdot*self.v_e()+(self.exitPressure-ambientPressure)*pi*(self.exitDiameter/2)**2;
+        return engineEfficiency*self.mdot*self.v_e()+(self.exitPressure-ambientPressure)*pi*(self.exitDiameter/2)**2;
 
     def v_e_effective(self,ambientPressure,engineEfficiency):
         #why would you do it this way? so ugly
@@ -152,11 +148,17 @@ exhaustGas = gas(
 ## The Vehicle
 
 class candidateRocket(object):
-    def __init__(self,engine,pressureDropRatio,vehicleDiameter,C_D,pressurantStorageTemp,propellantMass):
+    def __init__(self,candidateEngine,pressureDropRatio,vehicleDiameter,C_D,pressurantStorageTemp,propellantMass):
         self.penalties=0;
         
-        self.engine=engine
-        self.tankPressure=engine.chamberPressure*(1+pressureDropRatio)
+        if(candidateEngine.exitPressure<0.4*SLPRESSURE):
+            engineToUse=engine(candidateEngine.exhaustGas,candidateEngine.chamberPressure,0.4*SLPRESSURE,(candidateEngine.chamberDiameter/candidateEngine.throatDiameter),throatDiameter=candidateEngine.throatDiameter);
+            self.engine=engineToUse;
+            self.penalties+=0.1*(0.4*SLPRESSURE-candidateEngine.exitPressure)
+        else:
+            self.engine=candidateEngine
+            
+        self.tankPressure=self.engine.chamberPressure*(1+pressureDropRatio)
         
         self.fuelMass=propellantMass/(1+OFRatio)
         self.oxMass=self.fuelMass*OFRatio
@@ -208,10 +210,6 @@ class candidateRocket(object):
         self.finalBurnoutMass=self.totalTankageMass+self.engineMass+self.otherDryMass+self.pressurantMass;
         self.totalLiftoffMass=self.finalBurnoutMass+self.fuelMass+self.oxMass;   
         
-        print(self.finalBurnoutMass)
-        print(self.emptyTerminalVelocity())
-        print(self.engine.v_e_effective(SLPRESSURE, engineEfficiency))
-        
         self.landingPropellantMass=self.finalBurnoutMass*(exp((self.emptyTerminalVelocity())/(self.engine.v_e_effective(SLPRESSURE, engineEfficiency)))-1)
         
         self.MECOMass=self.finalBurnoutMass+self.landingPropellantMass;
@@ -225,18 +223,11 @@ class candidateRocket(object):
         
         if(engineEnvelope>self.vehicleDiameter):
             self.penalties+=10*((engineEnvelope-self.vehicleDiameter)/self.vehicleDiameter);
-            print('UNACCEPTABLE! '+str(self.penalties)+' YEARS DUNGEON');
+            print('This engine size is... UNACCEPTABLE! '+str(self.penalties)+' YEARS DUNGEON');
             
             self.vehicleDiameter=engineEnvelope;
             self.calculateMasses();
-        else:
-            self.penalties=0;
             
-        if self.vehicleDiameter<0.05:
-            self.penalties+=1000*(0.05-vehicleDiameter);
-            print('UNACCEPTABLE! '+str(self.penalties)+' YEARS DUNGEON');
-            self.vehicleDiameter=0.01
-            self.calculateMasses
 
     def ydot(self, y, t):
         x=y[0]
@@ -245,47 +236,56 @@ class candidateRocket(object):
         
         xdot=v
         
-        if(m>self.MECOMass):
-            mdot=-self.engine.mdot;
-            T=self.engine.thrust(airPressure(x),engineEfficiency);
-        else:
-            mdot=0;
-            T=0;
+        startMECOTime=(self.totalLiftoffMass-self.MECOMass-1)/self.engine.mdot
+        
+        MECODuration=(((self.totalLiftoffMass-self.MECOMass)/self.engine.mdot)-startMECOTime)*2
+        
+        throttleLevel=np.clip((((startMECOTime+MECODuration)-t)/MECODuration),0,1)
+        
+        mdot=-self.engine.mdot*throttleLevel;
+        T=self.engine.thrust(airPressure(x),engineEfficiency)*throttleLevel;
     
-        vdot=(T-0.5*airDensity(x)*self.C_D*(pi*(0.5*self.vehicleDiameter)**2)*v**2)/m-G0;
+        vdot=(T-0.5*airDensity(x)*self.C_D*(pi*(0.5*self.vehicleDiameter)**2)*v**2*np.sign(v))/m-G0;
 
-        if(x<0):
+        if(x<=0):
             xdot=max(xdot,0)
             vdot=max(vdot,0)
 
         #Hideously hacky :(
         #TODO: some sort of event detection for spint.ode???
-        if (T==0) and (v<=0):
-            xdot=0
-            vdot=0
-            mdot=0
+        #if (T==0) and (v<=0):
+        #    xdot=0
+        #    vdot=0
+        #    mdot=0
         
         return np.array([xdot,vdot,mdot])
         
     def getTrajectory(self, t, y0):
-        traj=spint.odeint(self.ydot, y0, t)
+        traj=spint.odeint(self.ydot, y0, t, mxstep=5000);
         return traj;
         
     def getApogee(self):
-        tee=np.linspace(0,300,num=250)
+        burnTime=(self.fuelMass+self.oxMass)/self.engine.mdot
+        
+        tee=np.concatenate([np.linspace(0,burnTime*1.1,num=100),np.linspace(burnTime*1.12,300,num=100)])
         y=self.getTrajectory(tee,np.array([0.0,0.0,self.totalLiftoffMass]))
-        return y[249,0]
+        return (np.nanmax(y,axis=0))[0]
         
     def sizeEngineToTMR(self,TMR):
         self.calculateMasses()
         
-        diff=99999
-        
-        while diff>0.001:
-            prevMass=self.totalLiftoffMass;
-            self.engine.resizeByThrust((self.totalLiftoffMass*TMR)/engineEfficiency)
-            self.calculateMasses()
-            diff=abs(self.totalLiftoffMass-prevMass);
+        if(TMR>(engineTMR/2)):
+            #And even this is ridiculous: why would you let half of your vehicle be engine? Weirdo.
+            self.sizeEngineToTMR(engineTMR/2)
+            self.penalties+=(TMR-engineTMR/2)*50
+        else:
+            diff=99999
+            
+            while diff>0.001:
+                prevMass=self.totalLiftoffMass;
+                self.engine.resizeByThrust((self.totalLiftoffMass*TMR)/engineEfficiency)
+                self.calculateMasses()
+                diff=abs(self.totalLiftoffMass-prevMass);
         
         
     def resizeToApogee(self,maxIterations,targetApogee,epsilon):
@@ -294,8 +294,8 @@ class candidateRocket(object):
         while (i<maxIterations):
             currentApogee=self.getApogee();
         
-                        
-            if (totalLiftoffMass>20000):
+            # Rocket is already stupidly huge, or can't get off the ground
+            if (self.totalLiftoffMass>2000000 or (self.engine.thrust(SLPRESSURE,engineEfficiency)/self.MECOMass)<9.81):
                 self.penalties+=abs(currentApogee-targetApogee)
                 return -1
         
