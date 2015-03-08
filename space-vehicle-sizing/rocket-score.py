@@ -52,6 +52,8 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
     
     if (targetApogee != None):
         testRocket.resizeToApogee(100,targetApogee,1)
+        
+    testRocket.validate();
     
     return testRocket
     

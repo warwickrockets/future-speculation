@@ -223,12 +223,13 @@ class candidateRocket(object):
     def emptyTerminalVelocity(self):
         return sqrt((2*G0*self.finalBurnoutMass)/(SLDENSITY*pi*self.C_D*(self.vehicleDiameter/2)**2));
              
-    def validate(self):
+    def validate(self,noPenalties=None):
         engineEnvelope=max(self.engine.exitDiameter,self.engine.chamberDiameter);
         
         if(engineEnvelope>self.vehicleDiameter):
-            self.penalties+=10*((engineEnvelope-self.vehicleDiameter)/self.vehicleDiameter);
-            print('This engine size is... UNACCEPTABLE! '+str(self.penalties)+' YEARS DUNGEON');
+            if noPenalties!=True:
+                self.penalties+=100*((engineEnvelope-self.vehicleDiameter)/self.vehicleDiameter);
+                print('This engine size is... UNACCEPTABLE! '+str(self.penalties)+' YEARS DUNGEON');
             
             self.vehicleDiameter=engineEnvelope;
             self.calculateMasses();
@@ -321,9 +322,8 @@ class candidateRocket(object):
                 self.pressurantMass*=scaleFactor
                 
                 self.calculateMasses()
-                self.validate()
-                
                 self.sizeEngineToTMR(currentLTMR)
+                self.validate(noPenalties=True)
                 
             i+=1
             
