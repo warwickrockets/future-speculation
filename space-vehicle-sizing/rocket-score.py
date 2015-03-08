@@ -56,11 +56,11 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
     return testRocket
     
 def rocketScore(theRocket):
-    print(str(theRocket.penalties)+","+str(-theRocket.totalLiftoffMass))
-    return theRocket.penalties-theRocket.totalLiftoffMass
+    return theRocket.penalties+theRocket.totalLiftoffMass
     
 def scoreFromFourVector(v):
-    print('------ trying '+str(v))
+    print('------')
+    print('trying '+str(v))
     chamberPressure=v[0]
     exitPressure=v[1]
     vehicleDiameter=v[2]
@@ -70,6 +70,8 @@ def scoreFromFourVector(v):
     return rocketScore(theRocket)
     
 initialGuess=np.array([1e6,8e4,0.3,20])
+spop.minimize(scoreFromFourVector,initialGuess,method="Nelder-Mead")
+
 #stupid=buildRocket(1.00187296e+06, 7.96115084e+08, 5.57025226e+03, 9.20496522e+04, None)
 #tee=np.concatenate([np.linspace(0,burnTime),np.linspace(burnTime*1.02,300,num=100)])
 #y0=np.array([0,0,stupid.totalLiftoffMass])
