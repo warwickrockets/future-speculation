@@ -8,6 +8,8 @@ from rocket import *
 import scipy.optimize as spop
 
 KARMAN_LINE = 100000; #SPAAAACE!
+MAX_FINENESS= 10; #still pretty long and skinny.
+SCALING_FACTORS=[1e+6, 1e+4, 0.1, 10.0]
 
 def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
     #Check that the dumbass optimisation algorithm has actually chosen choked flow conditions
@@ -35,12 +37,13 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
         print('Such a small vehicle diameter is... UNACCEPTABLE! '+str(1000*(0.1-vehicleDiameter))+' YEARS DUNGEON');
         vehicleDiameter=0.01
         
-    if (TMR<0):
-        outerPenalties+=-TMR*10000
-        print('You are having a bad problem and will not go to space today! Penalty: '+str(-TMR*10000)+' YEARS DUNGEON');
-        TMR=-TMR
+    if (TMR<G0*1.01):
+        outerPenalties+=(G0*1.01-TMR)*10000
+        print('You are having a bad problem and will not go to space today! Penalty: '+str((G0*1.01-TMR)*10000)+' YEARS DUNGEON');
+        TMR=G0*1.01
        
-    print('using '+str(np.array([chamberPressure,exitPressure,vehicleDiameter,TMR])))
+    #print('using '+str(np.array([chamberPressure,exitPressure,vehicleDiameter,TMR])))
+    print('.', end='')
     
     #Initially guess that the rocket masses 400kg
     testEngine=engine(exhaustGas,chamberPressure,exitPressure,contractionRatio,seaLevelThrust=(400*TMR/engineEfficiency))
@@ -60,19 +63,59 @@ def buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,targetApogee):
 def rocketScore(theRocket):
     return theRocket.penalties+theRocket.totalLiftoffMass
     
+def finenessRatioBoundFromFourVector(v,limit=MAX_FINENESS):
+    chamberPressure=v[0]*SCALING_FACTORS[0]
+    exitPressure=v[1]*SCALING_FACTORS[1]
+    vehicleDiameter=v[2]*SCALING_FACTORS[2]
+    TMR=v[3]*SCALING_FACTORS[3]
+    
+    #print('bounding by '+str(v))  
+    
+    theRocket=buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,KARMAN_LINE)
+    
+    return limit-theRocket.getBoosterLength()/theRocket.vehicleDiameter
+    
 def scoreFromFourVector(v):
-    print('------')
-    print('trying '+str(v))
-    chamberPressure=v[0]
-    exitPressure=v[1]
-    vehicleDiameter=v[2]
-    TMR=v[3]
+    #print('------')
+    #print('trying '+str(v))
+    chamberPressure=v[0]*SCALING_FACTORS[0]
+    exitPressure=v[1]*SCALING_FACTORS[1]
+    vehicleDiameter=v[2]*SCALING_FACTORS[2]
+    TMR=v[3]*SCALING_FACTORS[3]
     theRocket=buildRocket(chamberPressure,exitPressure,vehicleDiameter,TMR,KARMAN_LINE)
     
     return rocketScore(theRocket)
+
+def plotOptimumVsFineness(theRange):
+    lastResult=np.array([4.0,5.0,5.0,4.0])
+    results=np.zeros((4,theRange.shape[0]))
+
+    scores=np.zeros((1,theRange.shape[0]))
+
+    counter=0
     
-initialGuess=np.array([1e6,8e4,0.3,20])
-spop.minimize(scoreFromFourVector,initialGuess,method="Nelder-Mead")
+    for x in theRange:
+        lastResult=spop.fmin_cobyla(scoreFromFourVector,lastResult,finenessRatioBoundFromFourVector, consargs=(x,), rhobeg=0.1)
+        results[:,counter]=lastResult
+        scores[:,counter]=0.01*scoreFromFourVector(lastResult)
+        counter+=1
+
+    pl.scatter(theRange,results[0,:], c='r')
+    pl.scatter(theRange,results[1,:], c='b')
+    pl.scatter(theRange,results[2,:], c='g')
+    pl.scatter(theRange,results[3,:], c='k')
+    
+    pl.scatter(theRange,scores[0,:], c='y')
+
+        
+    return results
+        
+    
+#initialGuess=np.array([4e6,5e4,0.4,40]) this is unscaled!
+
+initialGuess=np.array([4.0,5.0,5.0,4.0]) #rescaled
+
+#optimum=spop.minimize(scoreFromFourVector,initialGuess,method="Nelder-Mead")
 
 #stupid=buildRocket(1.00187296e+06, 7.96115084e+08, 5.57025226e+03, 9.20496522e+04, None)
 #tee=np.concatenate([np.linspace(0,burnTime),np.linspace(burnTime*1.02,300,num=100)])

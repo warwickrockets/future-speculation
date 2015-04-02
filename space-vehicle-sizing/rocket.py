@@ -185,6 +185,9 @@ class candidateRocket(object):
         sphericalTankVolume=4/3*pi*(self.vehicleDiameter/2)**3
         
         if self.fuelTankVolume<sphericalTankVolume:
+            self.fuelTankCylLength=0
+            self.oxTankCylLength=0
+            
             fuelTankDiameter=2*(self.fuelTankVolume*3/(4*pi))**(1/3)
             self.fuelTankMass=TankMass(tankDensity, allowableTankStress, fuelTankDiameter, 0, self.tankPressure);
         else:
@@ -267,15 +270,18 @@ class candidateRocket(object):
         return np.array([xdot,vdot,mdot])
         
     def getTrajectory(self, t, y0):
-        traj=spint.odeint(self.ydot, y0, t);
+        traj=spint.odeint(self.ydot, y0, t, mxstep=2000, atol=1e-6);
         return traj;
         
     def getApogee(self):
         burnTime=(self.fuelMass+self.oxMass)/self.engine.mdot
         
-        tee=np.concatenate([np.linspace(0,burnTime*1.1,num=100),np.linspace(burnTime*1.12,300,num=100)])
+        tee=np.concatenate([np.linspace(0,burnTime*1.1,num=50),np.linspace(burnTime*1.12,300,num=20)])
         y=self.getTrajectory(tee,np.array([0.0,0.0,self.totalLiftoffMass]))
         return (np.nanmax(y,axis=0))[0]
+     
+    def getBoosterLength(self):
+         return self.fuelTankCylLength+self.oxTankCylLength+2*(self.vehicleDiameter)
         
     def sizeEngineToTMR(self,TMR):
         self.calculateMasses()
