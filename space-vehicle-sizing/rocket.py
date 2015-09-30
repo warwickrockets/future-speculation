@@ -270,7 +270,7 @@ class candidateRocket(object):
         return np.array([xdot,vdot,mdot])
         
     def getTrajectory(self, t, y0):
-        traj=spint.odeint(self.ydot, y0, t, mxstep=2000, atol=1e-6);
+        traj=spint.odeint(self.ydot, y0, t, mxstep=2000, rtol=1e-9);
         return traj;
         
     def getApogee(self):
