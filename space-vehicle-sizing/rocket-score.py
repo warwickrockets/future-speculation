@@ -115,6 +115,15 @@ def plotOptimumVsFineness(theRange):
 
 initialGuess=np.array([4.0,5.0,5.0,4.0]) #rescaled
 
+import timeit
+testRocket=buildRocket(4e6, 5e5, 0.5, 40., KARMAN_LINE)
+start_time = timeit.default_timer()
+for i in range(100):
+    testRocket.getApogee()
+elapsed = timeit.default_timer() - start_time
+
+print(elapsed/i)
+
 #optimum=spop.minimize(scoreFromFourVector,initialGuess,method="Nelder-Mead")
 
 #stupid=buildRocket(1.00187296e+06, 7.96115084e+08, 5.57025226e+03, 9.20496522e+04, None)
